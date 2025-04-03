@@ -1124,11 +1124,11 @@ bool SmartAIMgr::IsEventValid(SmartScriptHolder& e)
         return false;
     }
 
-    if (e.event.event_flags & SMART_EVENT_FLAGS_DEPRECATED)
+    /*if (e.event.event_flags & SMART_EVENT_FLAGS_DEPRECATED)
     {
         TC_LOG_ERROR("sql.sql", "SmartAIMgr: EntryOrGuid {} using event ({}) has deprecated event flags ({}), skipped.", e.entryOrGuid, e.event_id, e.event.event_flags);
         return false;
-    }
+    } */
 
     if (e.link && e.link == e.event_id)
     {
