@@ -220,6 +220,7 @@ class TC_GAME_API Item : public Object
         bool IsEquipped() const;
 
         uint32 GetSkill();
+        uint32 GetSpell();
 
         void SetItemRandomProperties(ItemRandomProperties randomProperties);
 

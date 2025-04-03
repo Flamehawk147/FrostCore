@@ -1970,10 +1970,14 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         static Difficulty CheckLoadedLegacyRaidDifficultyID(Difficulty difficulty);
         void SendRaidGroupOnlyMessage(RaidGroupReason reason, int32 delay) const;
 
+        bool UpdateSkill(uint32 skill_id, uint32 step);
         bool UpdateSkillPro(uint16 skillId, int32 chance, uint32 step);
         bool UpdateCraftSkill(SpellInfo const* spellInfo);
         bool UpdateGatherSkill(uint32 skillId, uint32 skillValue, uint32 redLevel, uint32 multiplicator = 1, WorldObject const* object = nullptr);
         bool UpdateFishingSkill(int32 expansion);
+
+        uint32 GetBaseDefenseSkillValue() const { return GetBaseSkillValue(SKILL_DEFENSE); }
+        uint32 GetBaseWeaponSkillValue(WeaponAttackType attType) const;
 
         float GetHealthBonusFromStamina() const;
         float GetManaBonusFromIntellect() const;
@@ -2137,6 +2141,10 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         void CleanupChannels();
         void UpdateLocalChannels(uint32 newZone);
         void LeaveLFGChannel();
+
+        void UpdateDefense();
+        void UpdateWeaponSkill(WeaponAttackType attType);
+        void UpdateCombatSkills(Unit* victim, WeaponAttackType attType, bool defence);
 
         typedef std::list<Channel*> JoinedChannelsList;
         JoinedChannelsList const& GetJoinedChannels() const { return m_channels; }

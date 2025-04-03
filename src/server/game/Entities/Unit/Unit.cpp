@@ -856,6 +856,13 @@ bool Unit::HasBreakableByDamageCrowdControlAura(Unit* excludeCasterChannel) cons
         }
     }
 
+    // Increase defense skill from direct damage only.
+    if (attacker && victim->IsPlayer() && cleanDamage && (cleanDamage->attackType == BASE_ATTACK || cleanDamage->attackType == OFF_ATTACK) && damagetype == DIRECT_DAMAGE && attacker != victim)
+    {
+        if (!attacker->IsPlayer()) // Only increase defense skill for mobs attacking not player.
+            victim->ToPlayer()->UpdateCombatSkills(attacker, cleanDamage->attackType, true);
+    }
+
     // Rage from Damage made (only from direct weapon damage)
     if (attacker && cleanDamage && (cleanDamage->attackType == BASE_ATTACK || cleanDamage->attackType == OFF_ATTACK) && damagetype == DIRECT_DAMAGE && attacker != victim && attacker->GetPowerType() == POWER_RAGE)
     {
@@ -1530,6 +1537,14 @@ void Unit::DealMeleeDamage(CalcDamageInfo* damageInfo, bool durabilityLoss)
         RoundToInterval(chance, 0.0f, 40.0f);
         if (roll_chance_f(chance))
             CastSpell(victim, 1604 /*SPELL_DAZED*/, true);
+    }
+
+    // Increase Weapon skill if it was a hit.
+    // the target hit must anyone but another player.
+    if ((damageInfo->HitOutCome == MELEE_HIT_CRIT || damageInfo->HitOutCome == MELEE_HIT_CRUSHING || damageInfo->HitOutCome == MELEE_HIT_NORMAL || damageInfo->HitOutCome == MELEE_HIT_GLANCING) &&
+        GetTypeId() == TYPEID_PLAYER && (victim->GetTypeId() != TYPEID_PLAYER))
+    {
+        ToPlayer()->UpdateCombatSkills(ToPlayer(), WeaponAttackType::BASE_ATTACK, false);
     }
 
     if (GetTypeId() == TYPEID_PLAYER)

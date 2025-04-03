@@ -4918,6 +4918,17 @@ void Player::LeaveLFGChannel()
     }
 }
 
+void Player::UpdateDefense()
+{
+    if (UpdateSkill(SKILL_DEFENSE, 1))
+    {
+        // update dependent from defense skill part
+        UpdateBlockPercentage();
+        UpdateParryPercentage();
+        UpdateDodgePercentage();
+    }
+}
+
 void Player::HandleBaseModFlatValue(BaseModGroup modGroup, float amount, bool apply)
 {
     if (modGroup >= BASEMOD_END)
@@ -5259,8 +5270,11 @@ void Player::UpdateRating(CombatRating cr)
 
     switch (cr)
     {
-        case CR_WEAPON_SKILL:
+        case CR_WEAPON_SKILL: // Implemented in Unit::RollMeleeOutcomeAgainst
         case CR_DEFENSE_SKILL:
+            UpdateBlockPercentage();
+            UpdateParryPercentage();
+            UpdateDodgePercentage();
             break;
         case CR_DODGE:
             UpdateDodgePercentage();
@@ -5376,6 +5390,30 @@ void Player::SetRegularAttackTime()
     }
 }
 
+//skill+step, checking for max value
+bool Player::UpdateSkill(uint32 skill_id, uint32 step)
+{
+    if (!skill_id)
+        return false;
+
+    if (skill_id == SKILL_FIST_WEAPONS)
+        skill_id = SKILL_UNARMED;
+
+    SkillStatusMap::iterator itr = mSkillStatus.find(skill_id);
+    if (itr == mSkillStatus.end() || itr->second.uState == SKILL_DELETED)
+        return false;
+
+    // Check if our current skill value is already at the highest if it is don't update it.
+    // If our current skill value is less than or equal to the max update it.
+    if (GetPureSkillValue(skill_id) <= GetPureMaxSkillValue(skill_id))
+    {
+        SetSkill(skill_id, GetSkillStep(skill_id), GetPureSkillValue(skill_id) + step, GetPureMaxSkillValue(skill_id));
+        return true;
+    }
+
+    return false;
+}
+
 inline int SkillGainChance(uint32 SkillValue, uint32 GrayLevel, uint32 GreenLevel, uint32 YellowLevel)
 {
     if (SkillValue >= GrayLevel)
@@ -5420,6 +5458,68 @@ bool Player::UpdateCraftSkill(SpellInfo const* spellInfo)
         }
     }
     return false;
+}
+
+void Player::UpdateWeaponSkill(WeaponAttackType attType)
+{
+    // no skill gain in pvp
+    Unit* victim = GetVictim();
+    if (victim && victim->GetTypeId() == TYPEID_PLAYER)
+        return;
+
+    if (IsInFeralForm())
+        return;                                             // always maximized SKILL_FERAL_COMBAT in fact
+
+    if (GetShapeshiftForm() == FORM_TREE_OF_LIFE)
+        return;                                             // use weapon but not skill up
+
+    if (victim && victim->GetTypeId() == TYPEID_UNIT && (victim->ToCreature()->GetCreatureTemplate()->flags_extra & CREATURE_FLAG_EXTRA_NO_SKILL_GAINS))
+        return;
+
+    Item* tmpitem = GetWeaponForAttack(attType, true);
+    if (!tmpitem && attType == BASE_ATTACK)
+        UpdateSkill(SKILL_UNARMED, 1);
+    else if (tmpitem && tmpitem->GetTemplate()->GetSubClass() != ITEM_SUBCLASS_WEAPON_FISHING_POLE)
+        UpdateSkill(tmpitem->GetSkill(), 1);
+
+    UpdateAllCritPercentages();
+}
+
+void Player::UpdateCombatSkills(Unit* victim, WeaponAttackType attType, bool defence)
+{
+    uint8 plevel = GetLevel();                    // if defense than victim == attacker
+    uint8 greylevel = Trinity::XP::GetGrayLevel(plevel);
+    uint8 moblevel = victim->GetLevelForTarget(this);
+    if (moblevel < greylevel)
+        return;
+
+    if (moblevel > plevel + 5)
+        moblevel = plevel + 5;
+
+    uint8 lvldif = moblevel - greylevel;
+    if (lvldif < 3)
+        lvldif = 3;
+
+    uint32 skilldif = 5 * plevel - (defence ? GetBaseDefenseSkillValue() : GetBaseWeaponSkillValue(attType));
+    if (skilldif <= 0)
+        return;
+
+    float chance = float(3 * lvldif * skilldif) / plevel;
+    if (!defence)
+        if (GetClass() == CLASS_WARRIOR || GetClass() == CLASS_ROGUE)
+            chance += chance * 0.02f * GetStat(STAT_INTELLECT);
+
+    chance = chance < 1.0f ? 1.0f : chance;                 //minimum chance to increase skill is 1%
+
+    if (roll_chance_f(chance))
+    {
+        if (defence)
+            UpdateDefense();
+        else
+            UpdateWeaponSkill(attType);
+    }
+    else
+        return;
 }
 
 bool Player::UpdateGatherSkill(uint32 skillId, uint32 skillValue, uint32 redLevel, uint32 multiplicator /*= 1*/, WorldObject const* object /*= nullptr*/)
@@ -24792,6 +24892,19 @@ bool Player::GetsRecruitAFriendBonus(bool forXP)
         }
     }
     return recruitAFriend;
+}
+
+uint32 Player::GetBaseWeaponSkillValue(WeaponAttackType attType) const
+{
+    Item* item = GetWeaponForAttack(attType, true);
+
+    // unarmed only with base attack
+    if (attType != BASE_ATTACK && !item)
+        return 0;
+
+    // weapon skill or (unarmed for base attack and for fist weapons)
+    uint32  skill = (item && item->GetSkill() != SKILL_FIST_WEAPONS) ? item->GetSkill() : uint32(SKILL_UNARMED);
+    return GetBaseSkillValue(skill);
 }
 
 void Player::RewardPlayerAndGroupAtEvent(uint32 creature_id, WorldObject* pRewardSource)
