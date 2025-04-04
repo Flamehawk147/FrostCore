@@ -37,8 +37,7 @@ body:
     attributes:
       label: Branch
       options:
-        - 3.3.5
-        - master
+        - 3.4.3 Classic
     validations:
       required: true
   - type: textarea
